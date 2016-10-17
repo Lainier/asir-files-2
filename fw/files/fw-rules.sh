@@ -84,12 +84,12 @@ iptables -A FORWARD -i $iwan -d $ip_dmz -o $idmz -p tcp --sport 80 -j ACCEPT
 #acceso desde el fw a internet
 
 iptables -A OUTPUT -s $ip_wan -o $iwan -p tcp --dport 80 -j ACCEPT
-iptables -A INPUT -p tcp --dport -m state --state ESTABLISHED,RELATED -j ACCEPT
+iptables -A INPUT -p tcp --dport 80 -m state --state ESTABLISHED,RELATED -j ACCEPT
 
 #acceso HTTPS desde el fw a internet
 
 iptables -A OUTPUT -s $ip_wan -o $iwan -p tcp --dport 443 -j ACCEPT
-iptables -A INPUT -p tcp --dport -m state --state ESTABLISHED,RELATED -j ACCEPT
+iptables -A INPUT -p tcp --dport 443 -m state --state ESTABLISHED,RELATED -j ACCEPT
 
  
 
