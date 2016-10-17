@@ -81,6 +81,18 @@ iptables -A FORWARD -o $idmz -s $ip_dmz -p tcp --sport 80 -j ACCEPT
 iptables -A FORWARD -i $idmz -s $ip_dmz -o $iwan -p tcp --dport 80 -j ACCEPT
 iptables -A FORWARD -i $iwan -d $ip_dmz -o $idmz -p tcp --sport 80 -j ACCEPT
 
+#acceso desde el fw a internet
+
+iptables -A OUTPUT -s $ip_wan -o $iwan -p tcp --dport 80 -j ACCEPT
+iptables -A INPUT -p tcp --dport -m state --state ESTABLISHED,RELATED -j ACCEPT
+
+#acceso HTTPS desde el fw a internet
+
+iptables -A OUTPUT -s $ip_wan -o $iwan -p tcp --dport 443 -j ACCEPT
+iptables -A INPUT -p tcp --dport -m state --state ESTABLISHED,RELATED -j ACCEPT
+
+ 
+
 #https a la dmz
 iptables -A FORWARD -d $ip_dmz -p tcp --dport 443 -j ACCEPT
 iptables -A FORWARD -s $ip_dmz -p tcp --sport 443 -j ACCEPT
