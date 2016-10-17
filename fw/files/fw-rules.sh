@@ -37,15 +37,16 @@ iptables -P FORWARD DROP
 
 # Reglas de acceso SSH
 #LAN
-iptables -A INPUT -s $ip_lan -i $ilan -p tcp --dport 2222 -j ACCEPT
-iptables -A OUTPUT -d $ip_lan -o $ilan -p tcp --sport 2222 -j ACCEPT
+iptables -A INPUT -d $ip_lan -i $ilan -p tcp --dport 2222 -j ACCEPT
+#iptables -A OUTPUT -s $ip_lan -o $ilan -p tcp --sport 2222 -j ACCEPT
 #WAN
-iptables -A INPUT -s $ip_wan -i $iwan -p tcp --dport 2222 -j ACCEPT
-iptables -A OUTPUT -d $ip_wan -o $iwan -p tcp --sport 2222 -j ACCEPT
+iptables -A INPUT -d $ip_wan -i $iwan -p tcp --dport 2222 -j ACCEPT
+#iptables -A OUTPUT -s $ip_wan -o $iwan -p tcp --sport 2222 -j ACCEPT
 #DMZ 
-iptables -A INPUT -s $ip_dmz -i $idmz -p tcp --dport 2222 -j ACCEPT
-iptables -A OUTPUT -d $ip_dmz -o $idmz -p tcp --sport 2222 -j ACCEPT
+iptables -A INPUT -d $ip_dmz -i $idmz -p tcp --dport 2222 -j ACCEPT
+#iptables -A OUTPUT -s $ip_dmz -o $idmz -p tcp --sport 2222 -j ACCEPT
 
+iptables -A OUTPUT -p tcp --sport 2222 -m state --state ESTABLISHED,RELATED -j ACCEPT
 
 # Reglas del servicio DHCPD
 
@@ -86,7 +87,7 @@ iptables -A FORWARD -s $ip_dmz -p tcp --sport 443 -j ACCEPT
 
 #ping
 iptables -A OUTPUT -p icmp -j ACCEPT
-iptables -A INPUT -p icmp -j ACCEPT
+iptables -A INPUT -p icmp -m state --state ESTABLISHED,RELATED -j ACCEPT
 iptables -A FORWARD -p icmp -j ACCEPT
 
 # Acceso al servidor web
@@ -109,14 +110,14 @@ iptables -t nat -A PREROUTING -i $iwan -d 10.3.4.199 -p tcp --dport 2222 -j DNAT
 
 # DNS dmz
 
-iptables -A OUTPUT -i $idmz -s 172.20.105.254 -p udp --dport 53 -d 172.20.105.22 -j ACCEPT
-iptables -A INPUT -o $idmz -d 172.20.105.254 -p udp --sport 53 -s 172.20.105.22 -j ACCEPT
+iptables -A OUTPUT -o $idmz -s 172.20.105.254 -p udp --dport 53 -d 172.20.105.22 -j ACCEPT
+#iptables -A INPUT -i $idmz -d 172.20.105.254 -p udp --sport 53 -s 172.20.105.22 -j ACCEPT
 
 #dns wan
-iptables -A OUTPUT -i $iwan -s 10.3.4.199 -p udp --dport 53 -j ACCEPT
-iptables -A INPUT -o $iwan -d 10.3.4.199 -p udp --sport 53 -j ACCEPT
+iptables -A OUTPUT -o $iwan -s 10.3.4.199 -p udp --dport 53 -j ACCEPT
+#iptables -A INPUT -i $iwan -d 10.3.4.199 -p udp --sport 53 -j ACCEPT
 
-
+iptables -A INPUT -p udp --sport 53 -m state --state ESTABLISHED,RELATED -j ACCEPT
 
 }
 
