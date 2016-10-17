@@ -1,0 +1,15 @@
+;
+; BIND reverse data file for local loopback interface
+;
+$ORIGIN 105.20.172.in-addr.arpa
+$TTL    604800
+@       IN      SOA     SRI.pc05.s04. admin.pc05s04. (
+                              1         ; Serial
+                         604800         ; Refresh
+                          86400         ; Retry
+                        2419200         ; Expire
+                         604800 )       ; Negative Cache TTL
+;
+@       IN      NS      SRI.pc05.s04.
+22      IN      PTR     SRI.pc05.s04.
+254     IN      PTR     SAD.pc05.s04.
