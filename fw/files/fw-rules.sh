@@ -37,14 +37,14 @@ iptables -P FORWARD DROP
 
 # Reglas de acceso SSH
 #LAN
-iptables -A INPUT -d $ip_lan -i $ilan -p tcp --dport 2222 -j ACCEPT
-iptables -A OUTPUT -s $ip_lan -o $ilan -p tcp --sport 2222 -j ACCEPT
+iptables -A INPUT -s $ip_lan -i $ilan -p tcp --dport 2222 -j ACCEPT
+iptables -A OUTPUT -d $ip_lan -o $ilan -p tcp --sport 2222 -j ACCEPT
 #WAN
-iptables -A INPUT -d $ip_wan -i $iwan -p tcp --dport 2222 -j ACCEPT
-iptables -A OUTPUT -s $ip_wan -o $iwan -p tcp --sport 2222 -j ACCEPT
+iptables -A INPUT -s $ip_wan -i $iwan -p tcp --dport 2222 -j ACCEPT
+iptables -A OUTPUT -d $ip_wan -o $iwan -p tcp --sport 2222 -j ACCEPT
 #DMZ 
-iptables -A INPUT -d $ip_dmz -i $idmz -p tcp --dport 2222 -j ACCEPT
-iptables -A OUTPUT -s $ip_dmz -o $idmz -p tcp --sport 2222 -j ACCEPT
+iptables -A INPUT -s $ip_dmz -i $idmz -p tcp --dport 2222 -j ACCEPT
+iptables -A OUTPUT -d $ip_dmz -o $idmz -p tcp --sport 2222 -j ACCEPT
 
 
 # Reglas del servicio DHCPD
