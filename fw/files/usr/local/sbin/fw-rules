@@ -1,0 +1,175 @@
+#!/bin/sh
+
+if [ $# -ne 1 ]; then
+	echo "You must supply one parameter {start|stop|restart}"
+	exit 1
+fi
+
+# VARS
+DMZ_NET="172.20.105.0/24"
+LAN_NET="192.168.105.0/24"
+
+DMZ_IF="ens3"
+WAN_IF="ens9"
+LAN_IF="ens10"
+
+DMZ_IP="172.20.105.254"
+WAN_IP="10.3.4.79"
+LAN_IP="192.168.105.254"
+
+CFG_FILE="/etc/default/fw-rules"
+
+if [ -r "$CFG_FILE" ] ; then
+	. $CFG_FILE
+fi
+
+STATUS_FILE="/var/run/fw-rules"
+
+case $1 in
+"start")
+
+	# Remove rules
+	$0 stop
+
+	#enable routing
+	echo "1" > /proc/sys/net/ipv4/ip_forward
+
+	# Default policies
+	iptables -P INPUT DROP
+	iptables -P OUTPUT DROP
+	iptables -P FORWARD DROP
+
+# servicios en el FireWall
+	# SSH desde REDES a FW (rules 1,2,3)
+	iptables -A INPUT -i $WAN_IF -d $WAN_IP -p tcp --dport 2222 -j ACCEPT
+	iptables -A INPUT -i $LAN_IF -s $LAN_NET -d $LAN_IP -p tcp --dport 2222 -j ACCEPT
+	iptables -A INPUT -i $DMZ_IF -s $DMZ_NET -d $DMZ_IP  -p tcp --dport 2222 -j ACCEPT
+
+	#dhcp
+	iptables -A INPUT -s $DMZ_NET -p udp --dport 68 -j ACCEPT
+	# seguimiento de conexiones para las respuestas
+	iptables -A OUTPUT -m state --state ESTABLISHED,RELATED -j ACCEPT
+
+# FireWall como cliente
+	# cliente DHCP
+	iptables -A OUTPUT -o $WAN_IF -p udp --dport 67 --sport 68 -j ACCEPT
+#	iptables -A INPUT -i $WAN_IF -p udp --sport 67 --dport 68 -m state --state ESTABLISHED,RELATED -j ACCEPT
+#	iptables -A INPUT -i $WAN_IF -p udp --sport 67 --dport 68 -j ACCEPT
+
+	# cliente PING (icmp)
+	iptables -A OUTPUT -p icmp -j ACCEPT
+#	iptables -A INPUT -p icmp -m state --state ESTABLISHED,RELATED -j ACCEPT
+#>	iptables -A INPUT -p icmp -j ACCEPT
+
+	# Cliente DNS
+	iptables -A OUTPUT -p udp --dport 53 -j ACCEPT
+	iptables -A OUTPUT -p tcp --dport 53 -j ACCEPT
+
+#	iptables -A INPUT -p udp --sport 53  -m state --state ESTABLISHED,RELATED -j ACCEPT
+#>	iptables -A INPUT -p udp --sport 53 -j ACCEPT
+
+	# Cliente HTTP
+	iptables -A OUTPUT -p tcp --dport 80 -j ACCEPT
+#	iptables -A INPUT -p tcp --sport 80  -m state --state ESTABLISHED,RELATED -j ACCEPT
+#>	iptables -A INPUT -i $WAN_IF -p tcp --sport 80 -j ACCEPT
+
+	# Cliente HTTPS
+	iptables -A OUTPUT -p tcp --dport 443 -j ACCEPT
+#	iptables -A INPUT -p tcp --sport 443  -m state --state ESTABLISHED,RELATED -j ACCEPT
+#>	iptables -A INPUT -i $WAN_IF -p tcp --sport 443 -j ACCEPT
+
+	# Cliente SSH
+	iptables -A OUTPUT -p tcp --dport 22 -j ACCEPT
+#	iptables -A INPUT -p tcp --sport 22  -m state --state ESTABLISHED,RELATED -j ACCEPT
+
+	iptables -A INPUT -m state --state ESTABLISHED,RELATED -j ACCEPT
+
+# Firewall como router
+	#Clientes DNS desde la DMZ a la WAN
+	iptables -A FORWARD -i $DMZ_IF -s $DMZ_NET -o $WAN_IF -p udp --dport 53 -j ACCEPT
+	iptables -t nat -A POSTROUTING -s $DMZ_NET -o $WAN_IF -p udp --dport 53 -j SNAT --to $WAN_IP
+
+	#Cliente DNS desde la WAN
+	#PETICIONES DE TRANSFERENCIAS DE ZONA
+	iptables -A FORWARD -i $WAN_IF -o $DMZ_IF -p tcp --dport 53 -j ACCEPT
+        iptables -t nat -A PREROUTING -i $WAN_IF -p tcp --dport 53 -j DNAT --to 172.20.105.22
+	#CONSULTAS DNS
+	iptables -A FORWARD -i $WAN_IF -o $DMZ_IF -p udp --dport 53 -j ACCEPT
+        iptables -t nat -A PREROUTING -i $WAN_IF -p udp --dport 53 -j DNAT --to 172.20.105.22
+
+	# Salida a Repositorios de Servidores de la DMZ (7)
+	iptables -A FORWARD -i $DMZ_IF -s $DMZ_NET -o $WAN_IF -p tcp --dport 80 -j ACCEPT
+#	iptables -A FORWARD -o $DMZ_IF -d $DMZ_NET -i $WAN_IF -p tcp --sport 80 -j ACCEPT
+	iptables -t nat -A POSTROUTING -s $DMZ_NET -o $WAN_IF -p tcp --dport 80 -j SNAT --to $WAN_IP
+
+	# Salida a Repositorios https (github) desde la DMZ (7)
+	iptables -A FORWARD -i $DMZ_IF -s $DMZ_NET -o $WAN_IF -p tcp --dport 443 -j ACCEPT
+#	iptables -A FORWARD -o $DMZ_IF -d $DMZ_NET -i $WAN_IF -p tcp --sport 80 -j ACCEPT
+	iptables -t nat -A POSTROUTING -s $DMZ_NET -o $WAN_IF -p tcp --dport 443 -j SNAT --to $WAN_IP
+
+	# SSH desde LAN a los servidores DMZ (8)
+	iptables -A FORWARD -i $LAN_IF -s $LAN_NET -o $DMZ_IF -d $DMZ_NET -p tcp --dport 22 -j ACCEPT
+#	iptables -A FORWARD -o $LAN_IF -d $LAN_NET -i $DMZ_IF -s $DMZ_NET -p tcp --sport 22 -j ACCEPT
+
+	# cliente DNS desde LAN a servidor DNS en la DMZ
+	iptables -A FORWARD -i $LAN_IF -s $LAN_NET -o $DMZ_IF -d $DMZ_NET -p udp --dport 53 -j ACCEPT
+#	iptables -A FORWARD -o $LAN_IF -d $LAN_NET -i $DMZ_IF -s $DMZ_NET -p udp --sport 53 -j ACCEPT
+
+	# HTTP desde LAN a servidor DMZ
+	iptables -A FORWARD -i $LAN_IF -s $LAN_NET -o $DMZ_IF -d $DMZ_NET -p tcp --dport 80 -j ACCEPT
+#	iptables -A FORWARD -o $LAN_IF -d $LAN_NET -i $DMZ_IF -s $DMZ_NET -p tcp --sport 80 -j ACCEPT
+
+	# HTTPS desde LAN a servidor DMZ
+	iptables -A FORWARD -i $LAN_IF -s $LAN_NET -o $DMZ_IF -d $DMZ_NET -p tcp --dport 443 -j ACCEPT
+#	iptables -A FORWARD -o $LAN_IF -d $LAN_NET -i $DMZ_IF -s $DMZ_NET -p tcp --sport 443 -j ACCEPT
+
+	# Navegacion WEB desde LAN a INTERNET (WAN)
+	iptables -A FORWARD -i $LAN_IF -s $LAN_NET -o $WAN_IF -p tcp --dport 80 -j ACCEPT
+#	iptables -A FORWARD -o $LAN_IF -d $LAN_NET -i $WAN_IF -p tcp --sport 80 -j ACCEPT
+	iptables -t nat -A POSTROUTING -s $LAN_NET -o $WAN_IF -p tcp --dport 80 -j SNAT --to $WAN_IP
+
+	iptables -A FORWARD -i $LAN_IF -s $LAN_NET -o $WAN_IF -p tcp --dport 443 -j ACCEPT
+#	iptables -A FORWARD -o $LAN_IF -d $LAN_NET -i $WAN_IF -p tcp --sport 443 -j ACCEPT
+	iptables -t nat -A POSTROUTING -s $LAN_NET -o $WAN_IF -p tcp --dport 443 -j SNAT --to $WAN_IP
+
+	# PING ICMP
+#	iptables -A FORWARD -i $LAN_IF -s $LAN_NET -o $DMZ_IF -d $DMZ_NET -p icmp -j ACCEPT
+#	iptables -A FORWARD -i $DMZ_IF -s $DMZ_NET -o $LAN_IF -d $LAN_IF -p icmp -j ACCEPT
+	iptables -A FORWARD -p icmp -j ACCEPT
+	iptables -t nat -A POSTROUTING -o $WAN_IF -p icmp  -j SNAT --to $WAN_IP
+
+
+	# Se permiten el FORWARD de todas las respuestas a peticiones hechas
+ 	iptables -A FORWARD -m state --state ESTABLISHED,RELATED -j ACCEPT
+
+	echo "fw-rules service started" > $STATUS_FILE
+	;;
+
+"stop")
+	rm -f "$STATUS_FILE"
+	iptables -F
+	iptables -t nat -F
+	iptables -P INPUT ACCEPT
+	iptables -P OUTPUT ACCEPT
+	iptables -P FORWARD ACCEPT
+
+	#disable routing
+	echo "0" > /proc/sys/net/ipv4/ip_forward
+	;;
+"restart")
+	$0 stop
+	$0 start
+	;;
+"status")
+	if [ -r "$STATUS_FILE" ]; then
+		cat "$STATUS_FILE"
+	else
+		echo "fw-rules service stopped"
+	fi
+	;;
+*)
+	echo "Se necesita un parametro válido [start | stop]"
+	exit 1
+	;;
+esac
+exit 0

@@ -1,0 +1,232 @@
+#!/bin/sh
+
+
+die(){
+	echo "$1" >&2
+	exit 1
+}
+
+usage(){
+	echo "Usage: $(basename "$0") PROYECT_NAME [--force --no-backup] update-system" >&2
+	echo "       $(basename "$0") PROYECT_NAME [--force ] update-repo" >&2
+	echo "       $(basename "$0") PROYECT_NAME {list|status}" >&2
+	die  "       $(basename "$0") PROYECT_NAME {track|untrack} FILE [FILE2 ... FILEn]"
+}
+
+test_git(){
+	if which git >/dev/null ; then
+		if git status >/dev/null 2>/dev/null ; then
+			return 0
+		fi
+	fi
+	return 1
+}
+
+list_files(){
+	REPO_DIR="$1"
+	find $REPO_DIR -type f -printf "%P\n"
+}
+
+do_status(){
+	REPO_DIR="$1"
+	for f in $(list_files "$REPO_DIR") ; do
+		file1="/$f"
+		file2="$REPO_DIR$f"
+		if [ ! -e "$file1" ] ; then
+			echo "* $file1 solo existe en el repositorio"
+		elif diff -q $file1 $file2 >/dev/null; then
+			echo "$file1 $file2 : iguales";
+		else
+			echo "* $file1 $file2 : diferentes";
+		fi
+	done
+}
+
+do_list_files(){
+	echo "======================================================"
+	echo "Currently tracked files:"
+	echo ""
+	list_files "$1"
+	echo "======================================================"
+}
+
+do_system_update(){
+	SOURCE_DIR="$1"
+	TIMESTAMP="$(date "+%F_%H%M")"
+	BACKUP_DIR="/BACKUP/$TIMESTAMP"
+	echo "======================================================"
+	echo "Update from local repository to system: REPO => SYSTEM"
+	do_list_files "$SOURCE_DIR"
+	if [ "$DO_BACKUP" = "Y" ] ; then
+		CMD="rsync -av -b --backup-dir=$BACKUP_DIR $SOURCE_DIR /"
+		echo "Backup directory: $BACKUP_DIR"
+	else
+		CMD="rsync -av $SOURCE_DIR /"
+		echo "No backup current files"
+	fi
+	echo "======================================================"
+	echo "Command to execute: $CMD"
+	echo "======================================================"
+	echo "**May the Force be with you**"
+	echo ""
+
+	if [ "$FORCE_UPDATE" != "Y" ] ; then
+		echo "Proceed (y/n)?:"
+		read a
+		if [ "$a" != "y" ] ; then
+			die "ABORTED!!!! Maybe next time, folk ;-)"
+		fi
+	fi
+	if $CMD ; then
+		echo "Update successfully."
+		if [ "$DO_BACKUP" = "Y" ] ; then
+ 			echo "Directory "$BACKUP_DIR" contains a backup of updated files"
+		fi
+	else
+		die "Some ERRORS appeared!!!!"
+	fi 
+}
+
+do_repo_update(){
+	TARGET_DIR="$1"
+	listaFicheros="$(tempfile)"
+	list_files $TARGET_DIR >$listaFicheros
+	CMD="rsync -av --files-from=$listaFicheros / $TARGET_DIR"
+
+	echo "======================================================"
+	echo "Update from local repository to system: SYSTEM => REPO"
+	do_list_files "$TARGET_DIR"
+
+	echo "Command to execute: $CMD"
+	echo "======================================================"
+	echo " **May the Force be with you**\n"
+	echo ""
+	if $CMD ; then
+		rm -f $listaFicheros
+		echo "Update successfully"
+	else
+		rm -f $listaFicheros
+		die "Some ERRORS appeared!!!!"
+	fi 
+	
+}
+
+
+do_track_file(){
+	SYS_FILE="$1"
+      	TR_DIR="$2"
+	[ -d "$TR_DIR" ] || mkdir -p  "$TR_DIR"
+        ruta_archivo=`dirname $1`
+
+	CARPETAFINAL="$TR_DIR/$ruta_archivo" 
+
+	mkdir -p "$CARPETAFINAL"
+
+	cp $SYS_FILE $CARPETAFINAL
+	if test_git ; then
+		git add "$TR_DIR$SYS_FILE"
+	fi
+}
+
+do_untrack_file(){
+	SYS_FILE="$1"
+	TR_DIR="$2"
+	if test_git ; then
+		git rm $TR_DIR$SYS_FILE 2>/dev/null
+	fi
+	rm -f $TR_DIR$SYS_FILE
+	rmdir -p $(dirname $TR_DIR$SYS_FILE) 2> /dev/null
+}
+
+# do some tests
+
+[ $# -ge 2 ] || usage
+
+which rsync >/dev/null || die "'rsync' utility not found. Please install the package"
+
+PROYECT_NAME="$1"
+[ -d "$PROYECT_NAME" ] || die "Proyect name invalid. (Please, create a folder named \"$PROYECT_NAME\" under current directory)"
+TR_DIR="$PROYECT_NAME/files/"
+
+shift
+
+FORCE_UPDATE="N"
+DO_BACKUP="Y"
+
+# search for 'force' or 'no-backup' options
+CONTINUE_SEARCH="Y"
+while [ "$CONTINUE_SEARCH" = "Y" ] ; do
+	case "$1" in
+		--force)
+			FORCE_UPDATE="Y"
+			shift
+			;;
+		--no-backup)
+			DO_BACKUP="N"
+			shift
+			;;
+		*)
+			CONTINUE_SEARCH="N"
+			;;
+
+	esac
+done			
+
+ACTION="$1"
+shift
+
+case "$ACTION" in
+	update-system)
+		[ -d "$TR_DIR" ] || die "Source directory \"$TR_DIR\" not found. Nothing to update.Exiting"
+		[ $(id -u) -eq 0 ] || die "You must be root, my friend"
+		do_system_update "$TR_DIR"
+		;;
+	update-repo)
+		[ -d "$TR_DIR" ] || die "Destination directory \"$TR_DIR\" not found. Nothing to update.Exiting"
+		do_repo_update "$TR_DIR"
+		;;
+	track)
+		[ "$1" ] || usage
+		while [ "$1" ] ; do
+			if [ -r "$1" ] ; then
+				do_track_file "$1" "$TR_DIR"
+			else
+				echo "File: $1 not found (skipped)"
+			fi
+			shift
+		done
+		;;
+	untrack)
+		[ "$1" ] || usage
+		while [ "$1" ] ; do
+			if [ -r "$TR_DIR/$1" ] ; then
+				do_untrack_file "$1" "$TR_DIR"
+			else
+				echo "File: $TR_DIR/$1 not found (skipped)"
+			fi
+			shift
+		done
+		;;
+	list)
+		[ -d "$TR_DIR" ] || die "Source directory \"$TR_DIR\" not found. No files to list"
+		do_list_files "$TR_DIR"
+
+		;;
+	status)
+		[ -d "$TR_DIR" ] || die "Source directory \"$TR_DIR\" not found. No files to list"
+		do_status "$TR_DIR"
+
+		;;
+	*)
+		usage
+		;;
+esac
+
+exit 0
+
+
+
+
+
+
+

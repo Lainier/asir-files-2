@@ -1,0 +1,11 @@
+# VARS
+DMZ_NET="172.20.100.0/24"
+LAN_NET="192.168.100.0/24"
+
+DMZ_IF="eth1"
+WAN_IF="eth0"
+LAN_IF="eth2"
+
+DMZ_IP="172.20.100.254"
+WAN_IP="$(LANG=C ifconfig $WAN_IF |sed -ne "/inet addr:/{s%^.*addr:%%;s% .*$%%;p}")"
+LAN_IP="192.168.100.254"
