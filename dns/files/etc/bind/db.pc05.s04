@@ -3,13 +3,15 @@ $ORIGIN pc05.s04.
 $TTL    604800
 
 @       IN      SOA     SRI.pc05.s04. admin.pc05s04. (
-                         2016091101     ; Serial
-                         604800         ; Refresh
+                         2016091104     ; Serial
+                           4800         ; Refresh
                           86400         ; Retry
                         2419200         ; Expire
                          604800 )       ; Negative Cache TTL
 ;
 @           IN      NS      SRI.pc05.s04.
+@           IN      NS      slave
+slave       IN      A       10.3.4.253
 SRI         IN      A       172.20.105.22
 SAD         IN      A       172.20.105.254
 pc05.s04.   IN      MX      10 SRI
