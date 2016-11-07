@@ -1,0 +1,16 @@
+$ORIGIN pc05.s04.
+
+$TTL    604800
+
+@       IN      SOA     SAD.pc05.s04. admin.pc05s04. (
+                         2016110701     ; Serial
+                           4800         ; Refresh
+                          86400         ; Retry
+                        2419200         ; Expire
+                         604800 )       ; Negative Cache TTL
+;
+@           IN      NS      SAD
+@           IN      NS      slave
+slave       IN      A       10.3.4.253
+SAD         IN      A       10.3.4.79
+
