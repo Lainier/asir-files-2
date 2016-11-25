@@ -9,4 +9,4 @@ ExecStop=/usr/local/sbin/fw-rules stop
 ExecReload=/usr/local/sbin/fw-rules restart
 
 [Install]
-WantedBy=multiuser.target
+WantedBy=multi-user.target

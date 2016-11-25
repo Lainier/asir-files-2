@@ -88,6 +88,9 @@ case $1 in
 	#Clientes DNS desde la DMZ a la WAN
 	iptables -A FORWARD -i $DMZ_IF -s $DMZ_NET -o $WAN_IF -p udp --dport 53 -j ACCEPT
 	iptables -t nat -A POSTROUTING -s $DMZ_NET -o $WAN_IF -p udp --dport 53 -j SNAT --to $WAN_IP
+	#Clientes DNS desde la DMZ a la WAN
+	iptables -A FORWARD -i $DMZ_IF -s $DMZ_NET -o $WAN_IF -p tcp --dport 53 -j ACCEPT
+	iptables -t nat -A POSTROUTING -s $DMZ_NET -o $WAN_IF -p tcp --dport 53 -j SNAT --to $WAN_IP
 
 	#Cliente DNS desde la WAN
 	#PETICIONES DE TRANSFERENCIAS DE ZONA
@@ -123,14 +126,17 @@ case $1 in
 	iptables -A FORWARD -i $LAN_IF -s $LAN_NET -o $DMZ_IF -d $DMZ_NET -p tcp --dport 443 -j ACCEPT
 #	iptables -A FORWARD -o $LAN_IF -d $LAN_NET -i $DMZ_IF -s $DMZ_NET -p tcp --sport 443 -j ACCEPT
 
-	# Navegacion WEB desde LAN a INTERNET (WAN)
-	iptables -A FORWARD -i $LAN_IF -s $LAN_NET -o $WAN_IF -p tcp --dport 80 -j ACCEPT
-#	iptables -A FORWARD -o $LAN_IF -d $LAN_NET -i $WAN_IF -p tcp --sport 80 -j ACCEPT
-	iptables -t nat -A POSTROUTING -s $LAN_NET -o $WAN_IF -p tcp --dport 80 -j SNAT --to $WAN_IP
+	#acceso al proxy desde la LAN
+	iptables -A FORWARD -i $LAN_IF -s $LAN_NET -o $DMZ_IF -d 172.20.105.200 -p tcp --dport 3128 -j ACCEPT
 
-	iptables -A FORWARD -i $LAN_IF -s $LAN_NET -o $WAN_IF -p tcp --dport 443 -j ACCEPT
-#	iptables -A FORWARD -o $LAN_IF -d $LAN_NET -i $WAN_IF -p tcp --sport 443 -j ACCEPT
-	iptables -t nat -A POSTROUTING -s $LAN_NET -o $WAN_IF -p tcp --dport 443 -j SNAT --to $WAN_IP
+	# Navegacion WEB desde LAN a INTERNET (WAN) Las comentamos para que no puedan navegar si no es por el proxy
+#	iptables -A FORWARD -i $LAN_IF -s $LAN_NET -o $WAN_IF -p tcp --dport 80 -j ACCEPT
+##	iptables -A FORWARD -o $LAN_IF -d $LAN_NET -i $WAN_IF -p tcp --sport 80 -j ACCEPT
+#	iptables -t nat -A POSTROUTING -s $LAN_NET -o $WAN_IF -p tcp --dport 80 -j SNAT --to $WAN_IP
+
+#	iptables -A FORWARD -i $LAN_IF -s $LAN_NET -o $WAN_IF -p tcp --dport 443 -j ACCEPT
+##	iptables -A FORWARD -o $LAN_IF -d $LAN_NET -i $WAN_IF -p tcp --sport 443 -j ACCEPT
+#	iptables -t nat -A POSTROUTING -s $LAN_NET -o $WAN_IF -p tcp --dport 443 -j SNAT --to $WAN_IP
 
 	# PING ICMP
 #	iptables -A FORWARD -i $LAN_IF -s $LAN_NET -o $DMZ_IF -d $DMZ_NET -p icmp -j ACCEPT
